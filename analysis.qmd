@@ -1,0 +1,123 @@
+---
+title: "Election"
+format: html
+execute:
+  echo: false
+---
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(primer.data)
+library(brms)
+library(tidybayes)
+library(gtsummary)
+```
+
+# Overview
+Using information about candidates for governor from 1945 to 2012, we seek to find the relationship between death age of Preceptor and whether or not he wins the mayoral election in Newton, Massachusetts. Modern medicine has increased the overall lifespan of all candidates regardless if they won or lost. We modeled the age of death as a sum of multiple variables multiplied by their coefficients: election result, how much they won by, age during the election, political party, and sex. We are 95% confident that Preceptor will live an extra 3 to 14 years. Our estimate is 8.6 years.
+
+# Question
+How old will Preceptor live to if he wins the election for mayer of Newton?
+
+# Wisdom
+
+## Preceptor Table
+A perfect table. One row for each mayer, columns are state, lived_after. Covariates are state, sex, election_age, party. 
+
+## EDA
+```{r}
+#| label: EDA
+
+x <-
+governors |>
+  mutate(treatment = ifelse(win_margin > 0, "win", "lose")) |>
+  filter(abs(win_margin) < 5)
+
+x |>
+  mutate(name = paste(first_name, last_name, sep = " ")) |>
+  select(name, election_age, state, year, lived_after) |>
+  ggplot(aes(x = election_age, y = lived_after)) +
+  geom_point()
+```
+
+
+## Validity
+Relationship between columns in preceptor table is the same for the data. One problem is governor is not a mayer
+
+# Justice
+
+## Population table
+table with preceptor table, data, and greater population
+
+## Stability
+People are living longer overtime because of better healthcare
+
+## Representativeness
+Massachusetts represents more than Newton
+
+## Unconfoundedness
+it's a predictive model
+
+not random because the people volunteered to run
+
+
+# Courage
+
+```{r}
+#| label: model
+#| cache: true
+
+
+fit_elec_2 <- brm(formula = death_age ~ treatment + party + win_margin,
+                  data = x,
+                  family = gaussian(),
+                  refresh = 0,
+                  silent = 2,
+                  seed = 9)
+
+fit_elec_2
+```
+
+```{r}
+pp_check(fit_elec_2)
+tbl_regression(fit_elec_2)
+```
+
+
+
+# Temprance
+
+## Variables
+
+treatment, win_margin, party
+
+## Values
+party: Republican, Democrat, Third Party\n
+treatment: win and lose\n
+win_margin: 0
+
+## Formula
+$$death\_age_i = \beta_{0} + \beta_{1} treatment_i + \beta_{2}party_i + \beta_{3}win\_margin_i + \epsilon_{i}$$
+
+```{r}
+
+treatment <- c("win", "lose")
+party <- c("Democrat", "Republican", "Third party")
+win_margin <- 0
+
+
+ndata <- expand_grid(treatment, party, win_margin)
+fit_elec_2 |>
+  add_epred_draws(newdata = ndata) |>
+  ggplot(aes(x = .epred, y = fct_reorder(party, .epred))) +
+  stat_slab(aes(fill = treatment), alpha = 0.5) +
+  labs(title = "Expected Lifespan Given Election Outcome",
+       subtitle = "Winning is associated with about 8 extra years",
+       x = "Expected Lifespan",
+       y = "",
+       fill = "Election Result")
+```
+
